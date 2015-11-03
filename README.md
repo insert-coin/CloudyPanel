@@ -1,0 +1,3 @@
+# CloudyPanel
+
+Management of players.
