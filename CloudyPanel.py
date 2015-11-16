@@ -28,7 +28,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         if(requestedCommand == "join"):
             index = getNewControllerID(username)
             if(index != -1):
-                command = "add " + str(index)
+                command = "join " + str(index)
                 result = connectToCPP(command)
                 if(result != ERROR_MSG):
                     ControllerMapping[index] = (1, username)
@@ -43,9 +43,9 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         elif(requestedCommand == "quit"):
             index = findControllerID(username)
             if(index != -1):
-                command = "remove " + str(index)
+                command = "quit " + str(index)
                 result = connectToCPP(command)
-                if(result != ERROR_MSG):
+                if (result != ERROR_MSG):
                     ControllerMapping[index] = (0, "")
                 self.request.sendall(result.encode("utf-8"))
                 print ('player removed')
@@ -81,7 +81,7 @@ def findControllerID(username):
 def connectToCPP(COMMAND):
     response = ""
     IP = '127.0.0.1'
-    PORT_NO = 55555
+    PORT_NO = 55556
     BUFFER_SIZE = 1024
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
