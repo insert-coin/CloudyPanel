@@ -2,81 +2,110 @@ import socketserver
 import socket
 import errno
 
+RECEIVED_MSG = "received"
 SUCCESS_MSG = "success"
 ERROR_MSG = "error"
+NOT_VALID = -1
 
+JOIN_REQ_CMD = "join"
+QUIT_REQ_CMD = "quit"
+JOIN_CMD = "0000"
+QUIT_CMD = "0001"
 
 # A mapping of <ControllerId> to (<Occupied>, <Usernames>) tuple
 ControllerMapping = {}
 for i in range(4):
     ControllerMapping[i] = (0, "")
 
+# Handles TCP request from CloudyLauncher, request access to CPP
 class MyTCPHandler(socketserver.BaseRequestHandler):
+
+    #Receives TCP request and handles it
     def handle(self):
-        print ('received.')
+        
+        # Read the requested message
+        print (RECEIVED_MSG)
         self.data = self.request.recv(1024).strip()
         Client_IP = self.client_address[0]
         Client_PORT = self.client_address[1]
         RequestedMessage = self.data.decode("utf-8")
-        
+        # For debugging purposes
         print("{} {} wrote:".format(Client_IP, Client_PORT))
         print(RequestedMessage + "\n")
-
+        # Convert to desired format
         requestedCommand = RequestedMessage.split(' ')[0]
         username = RequestedMessage.split(' ')[1]
 
         if(requestedCommand == "join"):
-            index = getNewControllerID(username)
-            if(index != -1):
-                command = "join " + str(index)
-                result = connectToCPP(command)
-                if(result != ERROR_MSG):
-                    ControllerMapping[index] = (1, username)
-                    self.request.sendall(str(index).encode("utf-8"))
-                    print ('sent controller id mapped.\n')
-                    print (str(ControllerMapping) + "\n")
-                else:
-                    self.request.sendall(result.encode("utf-8"))
-            else:
-                self.request.sendall(ERROR_MSG.encode("utf-8"))
-                
+            joinReq(self, username)              
         elif(requestedCommand == "quit"):
-            index = findControllerID(username)
-            if(index != -1):
-                command = "quit " + str(index)
-                result = connectToCPP(command)
-                if (result != ERROR_MSG):
-                    ControllerMapping[index] = (0, "")
-                self.request.sendall(result.encode("utf-8"))
-                print ('player removed')
-                print (str(ControllerMapping) + "\n")
-            else:
-                self.request.sendall(ERROR_MSG.encode("utf-8"))
+            quitReq(self, username)
+        # Invalid request
         else:
             self.request.sendall(ERROR_MSG.encode("utf-8"))
 
+    # Send join request
+    def joinReq(self, username):
+        # Get index
+        index = getNewControllerID(username)
+
+        if(index != NOT_VALID):
+            command = JOIN_CMD + str(index).zfill(4)
+            result = connectToCPP(command)
+            if(result != ERROR_MSG):
+                # Request success
+                ControllerMapping[index] = (1, username)
+                self.request.sendall(str(index).encode("utf-8"))
+                print ('sent controller id mapped.\n')
+                print (str(ControllerMapping) + "\n")
+            # Request denied
+            else:
+                self.request.sendall(result.encode("utf-8"))
+        # Invalid request
+        else:
+            self.request.sendall(ERROR_MSG.encode("utf-8"))
+
+    # Send quit request
+    def quitReq(self, username):
+        # Find index
+        index = findControllerID(username)
+
+        if(index != NOT_VALID):
+            command = QUIT_CMD + str(index).zfill(4)
+            result = connectToCPP(command)
+            if (result != ERROR_MSG):
+                # Request success
+                ControllerMapping[index] = (0, "")
+                self.request.sendall(result.encode("utf-8"))
+                print ('player removed')
+                print (str(ControllerMapping) + "\n")
+            # Request denied
+            else:
+                self.request.sendall(result.encode("utf-8"))
+        # Invalid request
+        else:
+            self.request.sendall(ERROR_MSG.encode("utf-8"))        
 
 def getNewControllerID(username):
-    
     # ensure unique username
     for occupied, playername in ControllerMapping.values():
         if (username == playername):
             print ('error: player already joined')
-            return -1
+            return NOT_VALID
     
     # get next available controller id.
     for i in range(4):
         if(ControllerMapping[i][0] == 0):
             return i
     print ('error: players maxed out')
-    return -1
+    return NOT_VALID
 
 def findControllerID(username):
     for i in range(4):
         if(ControllerMapping[i][1] == username):
             return i
     print ('error: player not found')
-    return -1
+    return NOT_VALID
 
 def connectToCPP(COMMAND):
     response = ""
@@ -102,6 +131,7 @@ def connectToCPP(COMMAND):
 
 if __name__ == '__main__':
 
+    # Settings
     HOST = '127.0.0.1'
     PORT = 55550
     BUFFER_SIZE = 1024
